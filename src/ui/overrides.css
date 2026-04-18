@@ -1,82 +1,384 @@
+/* ------------------------------------------------------------
+ * Full Calendar — corporate light design
+ * Tokens from calendar-prototype handoff (2026-04-18, variant #1 Classic).
+ * Scope: everything here is nested under `.fc` so Obsidian chrome is untouched.
+ * ------------------------------------------------------------ */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
 .is-phone .fc {
 	height: calc(100% - 4rem);
 }
+
 .fc {
+	/* ── Design tokens ───────────────────────────────────── */
+	--ofc-paper: #fafaf7;
+	--ofc-paper-alt: #f3f2ec;
+	--ofc-ink: #2a2a2a;
+	--ofc-ink-2: #555;
+	--ofc-ink-3: #8a8a8a;
+	--ofc-hair: rgba(0, 0, 0, 0.15);
+	--ofc-hair-dashed: rgba(0, 0, 0, 0.12);
+	--ofc-line: #2a2a2a;
+	--ofc-accent: #4a5ea8;
+	--ofc-accent-bg: rgba(74, 94, 168, 0.10);
+	--ofc-accent-bg-strong: rgba(74, 94, 168, 0.18);
+	--ofc-sand: #b98a3e;
+	--ofc-sand-bg: rgba(185, 138, 62, 0.12);
+
+	--ofc-font-ui: "IBM Plex Sans", "Inter Tight", -apple-system,
+		BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+	--ofc-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+		Consolas, monospace;
+
+	/* ── Force corporate-light palette inside the calendar ── */
 	height: 100%;
-	--fc-button-text-color: var(--text-normal);
-	--fc-button-bg-color: var(--interactive-normal);
-	--fc-button-border-color: var(--interactive-normal);
+	background: var(--ofc-paper);
+	color: var(--ofc-ink);
+	font-family: var(--ofc-font-ui);
+	font-feature-settings: "ss01", "cv11";
 
-	--fc-button-hover-bg-color: var(--interactive-hover);
-	--fc-button-hover-border-color: var(--interactive-hover);
+	/* ── Override FullCalendar CSS vars ────────────────────── */
+	--fc-page-bg-color: var(--ofc-paper);
+	--fc-border-color: var(--ofc-hair);
+	--fc-neutral-bg-color: var(--ofc-paper-alt);
+	--fc-neutral-text-color: var(--ofc-ink-3);
+	--fc-today-bg-color: var(--ofc-accent-bg);
+	--fc-now-indicator-color: var(--ofc-ink);
 
-	--fc-button-active-border-color: var(--interactive-accent);
-	--fc-button-active-bg-color: var(--interactive-accent);
+	--fc-button-text-color: var(--ofc-ink);
+	--fc-button-bg-color: transparent;
+	--fc-button-border-color: var(--ofc-line);
+	--fc-button-hover-bg-color: var(--ofc-paper-alt);
+	--fc-button-hover-border-color: var(--ofc-ink);
+	--fc-button-active-bg-color: var(--ofc-ink);
+	--fc-button-active-border-color: var(--ofc-ink);
 
-	--fc-event-border-color: var(--interactive-accent);
-	--fc-event-bg-color: var(--interactive-accent);
-	--fc-event-text-color: var(--text-on-accent);
+	--fc-event-border-color: var(--ofc-accent);
+	--fc-event-bg-color: var(--ofc-accent);
+	--fc-event-text-color: var(--ofc-ink);
 
-	--fc-list-event-hover-bg-color: var(--background-secondary);
-	--fc-neutral-bg-color: var(--background-primary-alt);
-
-	--fc-page-bg-color: var(--background-primary);
-	--fc-border-color: var(--background-modifier-border);
-
-	--fc-now-indicator-color: var(--text-error-hover);
-
-	--fc-more-link-bg-color: var(--background-primary-alt);
-	--fc-more-link-text-color: var(--text-accent);
-
-	--fc-today-bg-color: var(--background-modifier-cover);
-
-	--fc-neutral-text-color: var(--text-muted);
-	--fc-neutral-bg-color: var(--interactive-normal);
-
-	--fc-highlight-color: var(--text-highlight-bg);
-	--fc-bg-event-color: var(--background-modifier-success);
-	--fc-non-business-color: var(--background-modifier-box-shadow);
+	--fc-list-event-hover-bg-color: var(--ofc-paper-alt);
+	--fc-more-link-bg-color: var(--ofc-paper-alt);
+	--fc-more-link-text-color: var(--ofc-accent);
+	--fc-highlight-color: var(--ofc-accent-bg);
+	--fc-bg-event-color: var(--ofc-sand-bg);
+	--fc-non-business-color: rgba(0, 0, 0, 0.03);
 }
 
 .fc a {
 	text-decoration-line: none;
+	color: inherit;
 }
 
-.fc-button-active {
-	color: var(--text-on-accent) !important;
+/* ── Toolbar ─────────────────────────────────────────────── */
+.fc .fc-toolbar {
+	padding: 4px 2px 10px;
+	gap: 14px;
+}
+.fc .fc-toolbar-title {
+	font-family: var(--ofc-font-ui);
+	font-size: 1.25rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--ofc-ink);
 }
 .fc .fc-button {
-	border: 0px solid transparent !important;
+	font-family: var(--ofc-font-mono) !important;
+	font-size: 11px !important;
+	font-weight: 500 !important;
 	line-height: 1 !important;
-	padding: var(--size-4-1) var(--size-4-3) !important;
+	letter-spacing: 0.4px !important;
+	text-transform: lowercase;
+	border-radius: 1px !important;
+	border: 1px solid var(--ofc-line) !important;
+	padding: 5px 10px !important;
+	background: transparent !important;
+	color: var(--ofc-ink) !important;
+	box-shadow: none !important;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+.fc .fc-button:focus {
+	box-shadow: none !important;
+	outline: 1px solid var(--ofc-ink);
+	outline-offset: 1px;
+}
+.fc .fc-button-primary:hover:not(:disabled) {
+	background: var(--ofc-paper-alt) !important;
+	border-color: var(--ofc-ink) !important;
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+	background: var(--ofc-ink) !important;
+	color: var(--ofc-paper) !important;
+	border-color: var(--ofc-ink) !important;
+}
+.fc .fc-button .fc-icon {
+	font-size: 0.95em;
+	vertical-align: -1px;
+}
+/* Tight button group spacing so prev/next read as one unit */
+.fc .fc-button-group > .fc-button:not(:first-child) {
+	margin-left: -1px;
 }
 
+/* ── Day headers ─────────────────────────────────────────── */
+.fc-theme-standard td,
+.fc-theme-standard th {
+	border-color: var(--ofc-hair);
+}
+.fc .fc-col-header-cell {
+	border-color: var(--ofc-hair);
+	padding: 0;
+	vertical-align: top;
+}
+.fc .fc-col-header-cell-cushion {
+	display: block;
+	padding: 10px 12px;
+	color: var(--ofc-ink);
+}
+/* 2-line header markup — populated by `dayHeaderContent` callback in calendar.ts */
+.fc .ofc-dayhead {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+	line-height: 1;
+}
+.fc .ofc-dayhead-weekday {
+	font-family: var(--ofc-font-mono);
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--ofc-ink-3);
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+}
+.fc .ofc-dayhead-date {
+	font-family: var(--ofc-font-ui);
+	font-size: 20px;
+	font-weight: 600;
+	color: var(--ofc-ink);
+	letter-spacing: -0.01em;
+	margin-top: 2px;
+}
+/* Today column — subtle indigo wash */
+.fc .fc-col-header-cell.fc-day-today {
+	background: var(--ofc-accent-bg);
+}
+.fc .fc-col-header-cell.fc-day-today .ofc-dayhead-date {
+	color: var(--ofc-accent);
+}
+
+/* ── Time-grid body ──────────────────────────────────────── */
+.fc .fc-timegrid-slot-label,
+.fc .fc-timegrid-axis {
+	border-color: var(--ofc-hair);
+	font-family: var(--ofc-font-mono);
+	font-size: 10px;
+	color: var(--ofc-ink-3);
+	letter-spacing: 0.3px;
+}
+.fc .fc-timegrid-slot-label-cushion {
+	padding: 2px 8px 0;
+}
+.fc .fc-timegrid-slot-minor {
+	border-top-style: dashed;
+	border-top-color: var(--ofc-hair-dashed);
+}
+.fc .fc-timegrid-col.fc-day-today {
+	background: var(--ofc-accent-bg);
+}
+.fc .fc-scrollgrid,
+.fc .fc-scrollgrid-section > * {
+	border-color: var(--ofc-hair);
+}
+.fc-theme-standard .fc-scrollgrid {
+	border-color: var(--ofc-line);
+}
+
+/* ── Events (time-grid chips) ────────────────────────────── */
+.fc-v-event,
+.fc .fc-timegrid-event {
+	border: 0 !important;
+	border-left: 3px solid var(--fc-event-border-color, var(--ofc-accent)) !important;
+	border-radius: 1px !important;
+	box-shadow: none !important;
+	background: transparent !important;
+	overflow: hidden;
+	position: relative;
+}
+.fc-v-event::before,
+.fc .fc-timegrid-event::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: var(--fc-event-bg-color, var(--ofc-accent));
+	opacity: 0.12;
+	pointer-events: none;
+	z-index: 0;
+}
+.fc-v-event .fc-event-main,
+.fc .fc-timegrid-event .fc-event-main {
+	position: relative;
+	z-index: 1;
+	color: var(--ofc-ink);
+	padding: 3px 6px;
+}
+.fc-v-event .fc-event-time {
+	font-family: var(--ofc-font-mono);
+	font-size: 9px;
+	font-weight: 400;
+	color: var(--ofc-ink-3);
+	opacity: 1;
+	margin-bottom: 1px;
+}
+.fc-v-event .fc-event-title {
+	font-family: var(--ofc-font-ui);
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--ofc-ink);
+	line-height: 1.25;
+}
+.fc-v-event.fc-event-selected::after {
+	border-radius: 1px;
+}
+
+/* Events with a checkbox (tasks) — use sand accent on border strip */
+.fc-v-event:has(.ofc-has-checkbox),
+.fc .fc-timegrid-event:has(.ofc-has-checkbox) {
+	border-left-color: var(--ofc-sand) !important;
+}
+.fc-v-event:has(.ofc-has-checkbox)::before,
+.fc .fc-timegrid-event:has(.ofc-has-checkbox)::before {
+	background: var(--ofc-sand);
+	opacity: 0.12;
+}
+
+/* Day-grid (month) events — flat pill with dot */
+.fc-daygrid-event {
+	border-radius: 1px !important;
+	padding: 1px 4px;
+	font-family: var(--ofc-font-ui);
+	font-size: 11px;
+}
+.fc .fc-daygrid-event-dot {
+	border-color: var(--fc-event-border-color, var(--ofc-accent));
+	border-width: 4px;
+	margin: 0 6px 0 2px;
+}
+.fc .fc-daygrid-day-number {
+	font-family: var(--ofc-font-ui);
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--ofc-ink);
+	padding: 6px 8px;
+}
+.fc .fc-daygrid-day.fc-day-today {
+	background: var(--ofc-accent-bg);
+}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+	color: var(--ofc-accent);
+	font-weight: 700;
+}
+
+/* ── Now indicator — solid ink line with label ───────────── */
+.fc .fc-timegrid-now-indicator-line {
+	border-color: var(--ofc-ink);
+	border-width: 1.5px;
+}
+.fc .fc-timegrid-now-indicator-arrow {
+	display: none;
+}
+.fc .fc-timegrid-now-indicator-container::before {
+	content: "now";
+	position: absolute;
+	left: 2px;
+	top: -7px;
+	font-family: var(--ofc-font-mono);
+	font-size: 9px;
+	color: var(--ofc-ink);
+	background: var(--ofc-paper);
+	padding: 0 4px;
+	letter-spacing: 0.3px;
+	z-index: 3;
+}
+
+/* ── List view ───────────────────────────────────────────── */
+.fc-theme-standard .fc-list {
+	border-color: var(--ofc-hair);
+}
+.fc-theme-standard .fc-list-day-cushion {
+	background: var(--ofc-paper-alt);
+}
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
+	font-family: var(--ofc-font-ui);
+	font-weight: 600;
+	color: var(--ofc-ink);
+}
+.fc .fc-list-event-time {
+	font-family: var(--ofc-font-mono);
+	font-size: 11px;
+	color: var(--ofc-ink-3);
+}
+.fc .fc-list-event-dot {
+	border-color: var(--fc-event-border-color, var(--ofc-accent));
+}
+.fc .fc-list-event-title {
+	font-family: var(--ofc-font-ui);
+	color: var(--ofc-ink);
+}
+
+/* ── Selection / hover mirror ────────────────────────────── */
+.fc .fc-highlight {
+	background: var(--ofc-accent-bg-strong);
+}
+.fc .fc-timegrid-col-events .fc-event-mirror::before {
+	background: var(--ofc-accent);
+	opacity: 0.2;
+}
+
+/* ── Task checkboxes (plugin-specific) ───────────────────── */
 .ofc-has-checkbox {
 	display: flex !important;
+	align-items: center;
+	gap: 4px;
 }
-
 .ofc-has-checkbox.fc-list-event-title {
 	align-items: center;
 }
-
-.ofc-task-completed .fc-event-title {
-	text-decoration: line-through;
-}
-
+.ofc-task-completed .fc-event-title,
 .ofc-task-completed .fc-list-event-title {
 	text-decoration: line-through;
+	color: var(--ofc-ink-3);
 }
-
 .ofc-task-completed {
-	opacity: 0.8;
+	opacity: 0.75;
 }
-
-.ofc-checkbox-white {
-	border-color: white !important;
-	border-width: 1px !important;
-}
-
+.ofc-checkbox-white,
 .ofc-checkbox-black {
-	border-color: black !important;
+	border-color: var(--ofc-ink) !important;
 	border-width: 1px !important;
+	border-radius: 1px !important;
+	margin: 0;
+}
+
+/* ── Popover (event detail) ──────────────────────────────── */
+.fc-theme-standard .fc-popover {
+	background: var(--ofc-paper);
+	border: 1px solid var(--ofc-line);
+	border-radius: 1px;
+	box-shadow: none;
+}
+.fc-theme-standard .fc-popover-header {
+	background: var(--ofc-paper-alt);
+	color: var(--ofc-ink);
+	font-family: var(--ofc-font-ui);
+	font-weight: 600;
+}
+
+/* ── Accessibility: preserve focus rings on active chips ── */
+.fc .fc-event:focus-visible {
+	outline: 1.5px solid var(--ofc-ink);
+	outline-offset: 1px;
 }
