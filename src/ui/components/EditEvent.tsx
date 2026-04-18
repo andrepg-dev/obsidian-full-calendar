@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarInfo, OFCEvent } from "../../types";
 
 function makeChangeListener<T>(
@@ -10,43 +10,14 @@ function makeChangeListener<T>(
     return (e) => setState(fromString(e.target.value));
 }
 
-interface DayChoiceProps {
-    code: string;
-    label: string;
-    isSelected: boolean;
-    onClick: (code: string) => void;
-}
-const DayChoice = ({ code, label, isSelected, onClick }: DayChoiceProps) => (
-    <button
-        type="button"
-        style={{
-            marginLeft: "0.25rem",
-            marginRight: "0.25rem",
-            padding: "0",
-            backgroundColor: isSelected
-                ? "var(--interactive-accent)"
-                : "var(--interactive-normal)",
-            color: isSelected ? "var(--text-on-accent)" : "var(--text-normal)",
-            borderStyle: "solid",
-            borderWidth: "1px",
-            borderRadius: "50%",
-            width: "25px",
-            height: "25px",
-        }}
-        onClick={() => onClick(code)}
-    >
-        <b>{label[0]}</b>
-    </button>
-);
-
-const DAY_MAP = {
-    U: "Sunday",
-    M: "Monday",
-    T: "Tuesday",
-    W: "Wednesday",
-    R: "Thursday",
-    F: "Friday",
-    S: "Saturday",
+const DAY_MAP: Record<string, string> = {
+    U: "Sun",
+    M: "Mon",
+    T: "Tue",
+    W: "Wed",
+    R: "Thu",
+    F: "Fri",
+    S: "Sat",
 };
 
 const DaySelect = ({
@@ -55,25 +26,29 @@ const DaySelect = ({
 }: {
     value: string[];
     onChange: (days: string[]) => void;
-}) => {
-    return (
-        <div>
-            {Object.entries(DAY_MAP).map(([code, label]) => (
-                <DayChoice
+}) => (
+    <div className="ofc-dayrow">
+        {Object.entries(DAY_MAP).map(([code, label]) => {
+            const isSelected = days.includes(code);
+            return (
+                <button
                     key={code}
-                    code={code}
-                    label={label}
-                    isSelected={days.includes(code)}
+                    type="button"
+                    className={
+                        "ofc-daychip" + (isSelected ? " is-active" : "")
+                    }
                     onClick={() =>
-                        days.includes(code)
+                        isSelected
                             ? onChange(days.filter((c) => c !== code))
                             : onChange([code, ...days])
                     }
-                />
-            ))}
-        </div>
-    );
-};
+                >
+                    {label}
+                </button>
+            );
+        })}
+    </div>
+);
 
 interface EditEventProps {
     submit: (frontmatter: OFCEvent, calendarIndex: number) => Promise<void>;
@@ -86,6 +61,20 @@ interface EditEventProps {
     initialEvent?: Partial<OFCEvent>;
     open?: () => Promise<void>;
     deleteEvent?: () => Promise<void>;
+    cancel?: () => void;
+}
+
+function computeDuration(start: string, end: string): string {
+    if (!start || !end) return "—";
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    let mins = eh * 60 + em - (sh * 60 + sm);
+    if (Number.isNaN(mins) || mins <= 0) return "—";
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
 }
 
 export const EditEvent = ({
@@ -93,9 +82,12 @@ export const EditEvent = ({
     submit,
     open,
     deleteEvent,
+    cancel,
     calendars,
     defaultCalendarIndex,
 }: EditEventProps) => {
+    const isEdit = Boolean(open);
+
     const [date, setDate] = useState(
         initialEvent
             ? initialEvent.type === "single"
@@ -129,24 +121,19 @@ export const EditEvent = ({
         initialEvent?.type === "recurring" || false
     );
     const [endRecur, setEndRecur] = useState("");
-
     const [daysOfWeek, setDaysOfWeek] = useState<string[]>(
         (initialEvent?.type === "recurring" ? initialEvent.daysOfWeek : []) ||
             []
     );
-
     const [allDay, setAllDay] = useState(initialEvent?.allDay || false);
-
     const [calendarIndex, setCalendarIndex] = useState(defaultCalendarIndex);
-
-    const [complete, setComplete] = useState(
+    const [complete, setComplete] = useState<string | false | null | undefined>(
         initialEvent?.type === "single" &&
             initialEvent.completed !== null &&
             initialEvent.completed !== undefined
             ? initialEvent.completed
             : false
     );
-
     const [isTask, setIsTask] = useState(
         initialEvent?.type === "single" &&
             initialEvent.completed !== undefined &&
@@ -155,10 +142,13 @@ export const EditEvent = ({
 
     const titleRef = useRef<HTMLInputElement>(null);
     useEffect(() => {
-        if (titleRef.current) {
-            titleRef.current.focus();
-        }
-    }, [titleRef]);
+        titleRef.current?.focus();
+    }, []);
+
+    const duration = useMemo(
+        () => computeDuration(startTime, endTime),
+        [startTime, endTime]
+    );
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -194,42 +184,188 @@ export const EditEvent = ({
         );
     };
 
+    const onKey = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.preventDefault();
+            (e.currentTarget as HTMLFormElement).requestSubmit();
+        } else if (e.key === "Escape" && cancel) {
+            e.preventDefault();
+            cancel();
+        }
+    };
+
+    const editableCalendars = calendars.flatMap((cal) =>
+        cal.type === "local" || cal.type === "dailynote" ? [cal] : []
+    );
+
     return (
-        <>
-            <div>
-                <p style={{ float: "right" }}>
-                    {open && <button onClick={open}>Open Note</button>}
-                </p>
+        <form
+            className="ofc-dialog"
+            onSubmit={handleSubmit}
+            onKeyDown={onKey}
+        >
+            <header className="ofc-dialog-header">
+                <span className="ofc-dialog-title">
+                    {isEdit ? "Edit event" : "New event"}
+                </span>
+                <span className="ofc-dialog-hint">esc to close</span>
+            </header>
+
+            <div className="ofc-pillrow">
+                <button
+                    type="button"
+                    className={
+                        "ofc-pill ofc-pill-evt" + (!isTask ? " is-active" : "")
+                    }
+                    onClick={() => setIsTask(false)}
+                >
+                    ▪ MEETING
+                </button>
+                <button
+                    type="button"
+                    className={
+                        "ofc-pill ofc-pill-task" + (isTask ? " is-active" : "")
+                    }
+                    onClick={() => {
+                        setIsTask(true);
+                        if (complete === false || complete === undefined) {
+                            setComplete(false);
+                        }
+                    }}
+                >
+                    ▪ FOCUS BLOCK
+                </button>
+                <button
+                    type="button"
+                    className={
+                        "ofc-pill" + (allDay ? " is-active" : "")
+                    }
+                    onClick={() => setAllDay((v) => !v)}
+                >
+                    ▪ ALL-DAY
+                </button>
+                <button
+                    type="button"
+                    className={
+                        "ofc-pill" + (isRecurring ? " is-active" : "")
+                    }
+                    onClick={() => setIsRecurring((v) => !v)}
+                >
+                    ▪ REPEAT
+                </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
-                <p>
+            <div className="ofc-dialog-body">
+                <label className="ofc-field">
+                    <span className="ofc-field-label">TITLE</span>
                     <input
                         ref={titleRef}
                         type="text"
-                        id="title"
+                        className="ofc-input"
                         value={title}
-                        placeholder={"Add title"}
+                        placeholder="Add title…"
                         required
                         onChange={makeChangeListener(setTitle, (x) => x)}
                     />
-                </p>
-                <p>
-                    <select
-                        id="calendar"
-                        value={calendarIndex}
-                        onChange={makeChangeListener(
-                            setCalendarIndex,
-                            parseInt
-                        )}
-                    >
-                        {calendars
-                            .flatMap((cal) =>
-                                cal.type === "local" || cal.type === "dailynote"
-                                    ? [cal]
-                                    : []
-                            )
-                            .map((cal, idx) => (
+                </label>
+
+                <div className="ofc-grid-2">
+                    <label className="ofc-field">
+                        <span className="ofc-field-label">
+                            {isRecurring ? "STARTS" : "DATE"}
+                        </span>
+                        <input
+                            type="date"
+                            className="ofc-input ofc-input-mono"
+                            value={date || ""}
+                            required={!isRecurring || !!date}
+                            onChange={makeChangeListener(
+                                setDate,
+                                (x) => x as any
+                            )}
+                        />
+                    </label>
+                    <label className="ofc-field">
+                        <span className="ofc-field-label">
+                            {isRecurring ? "ENDS (OPTIONAL)" : "END DATE"}
+                        </span>
+                        <input
+                            type="date"
+                            className="ofc-input ofc-input-mono"
+                            value={
+                                (isRecurring ? endRecur : endDate || "") || ""
+                            }
+                            onChange={
+                                isRecurring
+                                    ? makeChangeListener(setEndRecur, (x) => x)
+                                    : makeChangeListener(
+                                          setEndDate,
+                                          (x) => x as any
+                                      )
+                            }
+                        />
+                    </label>
+                </div>
+
+                {!allDay && (
+                    <div className="ofc-grid-3">
+                        <label className="ofc-field">
+                            <span className="ofc-field-label">START</span>
+                            <input
+                                type="time"
+                                className="ofc-input ofc-input-mono"
+                                value={startTime}
+                                required
+                                onChange={makeChangeListener(
+                                    setStartTime,
+                                    (x) => x
+                                )}
+                            />
+                        </label>
+                        <label className="ofc-field">
+                            <span className="ofc-field-label">END</span>
+                            <input
+                                type="time"
+                                className="ofc-input ofc-input-mono"
+                                value={endTime}
+                                required
+                                onChange={makeChangeListener(
+                                    setEndTime,
+                                    (x) => x
+                                )}
+                            />
+                        </label>
+                        <div className="ofc-field">
+                            <span className="ofc-field-label">DURATION</span>
+                            <div className="ofc-input ofc-input-mono ofc-input-readonly">
+                                {duration}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {isRecurring && (
+                    <div className="ofc-field">
+                        <span className="ofc-field-label">REPEAT ON</span>
+                        <DaySelect
+                            value={daysOfWeek}
+                            onChange={setDaysOfWeek}
+                        />
+                    </div>
+                )}
+
+                {editableCalendars.length > 1 && (
+                    <label className="ofc-field">
+                        <span className="ofc-field-label">CALENDAR</span>
+                        <select
+                            className="ofc-input"
+                            value={calendarIndex}
+                            onChange={makeChangeListener(
+                                setCalendarIndex,
+                                parseInt
+                            )}
+                        >
+                            {editableCalendars.map((cal, idx) => (
                                 <option
                                     key={idx}
                                     value={idx}
@@ -246,112 +382,14 @@ export const EditEvent = ({
                                         : "Daily Note"}
                                 </option>
                             ))}
-                    </select>
-                </p>
-                <p>
-                    {!isRecurring && (
-                        <input
-                            type="date"
-                            id="date"
-                            value={date}
-                            required={!isRecurring}
-                            // @ts-ignore
-                            onChange={makeChangeListener(setDate, (x) => x)}
-                        />
-                    )}
-
-                    {allDay ? (
-                        <></>
-                    ) : (
-                        <>
-                            <input
-                                type="time"
-                                id="startTime"
-                                value={startTime}
-                                required
-                                onChange={makeChangeListener(
-                                    setStartTime,
-                                    (x) => x
-                                )}
-                            />
-                            -
-                            <input
-                                type="time"
-                                id="endTime"
-                                value={endTime}
-                                required
-                                onChange={makeChangeListener(
-                                    setEndTime,
-                                    (x) => x
-                                )}
-                            />
-                        </>
-                    )}
-                </p>
-                <p>
-                    <label htmlFor="allDay">All day event </label>
-                    <input
-                        id="allDay"
-                        checked={allDay}
-                        onChange={(e) => setAllDay(e.target.checked)}
-                        type="checkbox"
-                    />
-                </p>
-                <p>
-                    <label htmlFor="recurring">Recurring Event </label>
-                    <input
-                        id="recurring"
-                        checked={isRecurring}
-                        onChange={(e) => setIsRecurring(e.target.checked)}
-                        type="checkbox"
-                    />
-                </p>
-
-                {isRecurring && (
-                    <>
-                        <DaySelect
-                            value={daysOfWeek}
-                            onChange={setDaysOfWeek}
-                        />
-                        <p>
-                            Starts recurring
-                            <input
-                                type="date"
-                                id="startDate"
-                                value={date}
-                                // @ts-ignore
-                                onChange={makeChangeListener(setDate, (x) => x)}
-                            />
-                            and stops recurring
-                            <input
-                                type="date"
-                                id="endDate"
-                                value={endRecur}
-                                onChange={makeChangeListener(
-                                    setEndRecur,
-                                    (x) => x
-                                )}
-                            />
-                        </p>
-                    </>
+                        </select>
+                    </label>
                 )}
-                <p>
-                    <label htmlFor="task">Task Event </label>
-                    <input
-                        id="task"
-                        checked={isTask}
-                        onChange={(e) => {
-                            setIsTask(e.target.checked);
-                        }}
-                        type="checkbox"
-                    />
-                </p>
 
                 {isTask && (
-                    <>
-                        <label htmlFor="taskStatus">Complete? </label>
+                    <label className="ofc-checkbox-row">
                         <input
-                            id="taskStatus"
+                            type="checkbox"
                             checked={
                                 !(complete === false || complete === undefined)
                             }
@@ -362,40 +400,47 @@ export const EditEvent = ({
                                         : false
                                 )
                             }
-                            type="checkbox"
                         />
-                    </>
+                        <span>Mark as completed</span>
+                    </label>
                 )}
+            </div>
 
-                <p
-                    style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        width: "100%",
-                    }}
-                >
-                    <button type="submit"> Save Event </button>
-                    <span>
-                        {deleteEvent && (
-                            <button
-                                type="button"
-                                style={{
-                                    backgroundColor:
-                                        "var(--interactive-normal)",
-                                    color: "var(--background-modifier-error)",
-                                    borderColor:
-                                        "var(--background-modifier-error)",
-                                    borderWidth: "1px",
-                                    borderStyle: "solid",
-                                }}
-                                onClick={deleteEvent}
-                            >
-                                Delete Event
-                            </button>
-                        )}
-                    </span>
-                </p>
-            </form>
-        </>
+            <footer className="ofc-dialog-footer">
+                <span className="ofc-dialog-hint">⌘↵ to save</span>
+                <div className="ofc-dialog-actions">
+                    {deleteEvent && (
+                        <button
+                            type="button"
+                            className="ofc-btn ofc-btn-danger"
+                            onClick={deleteEvent}
+                        >
+                            Delete
+                        </button>
+                    )}
+                    {open && (
+                        <button
+                            type="button"
+                            className="ofc-btn ofc-btn-ghost"
+                            onClick={open}
+                        >
+                            Open note
+                        </button>
+                    )}
+                    {cancel && (
+                        <button
+                            type="button"
+                            className="ofc-btn ofc-btn-ghost"
+                            onClick={cancel}
+                        >
+                            Cancel
+                        </button>
+                    )}
+                    <button type="submit" className="ofc-btn ofc-btn-primary">
+                        {isEdit ? "Save" : "Create event"}
+                    </button>
+                </div>
+            </footer>
+        </form>
     );
 };

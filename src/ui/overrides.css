@@ -13,7 +13,7 @@
 .fc {
 	/* ── Design tokens ───────────────────────────────────── */
 	--ofc-paper: #fafaf7;
-	--ofc-paper-alt: #f3f2ec;
+	--ofc-paper-alt: #fff;
 	--ofc-ink: #2a2a2a;
 	--ofc-ink-2: #555;
 	--ofc-ink-3: #8a8a8a;
@@ -381,4 +381,302 @@
 .fc .fc-event:focus-visible {
 	outline: 1.5px solid var(--ofc-ink);
 	outline-offset: 1px;
+}
+
+/* ============================================================
+ * Add / Edit event dialog
+ * Source: calendar-prototype "Add Event" handoff (2026-04-18, #1 Full form).
+ * ============================================================ */
+
+/* Tame Obsidian's modal chrome only when our dialog is inside.
+ * `:has()` scopes this so other plugins' modals are untouched. */
+.modal:has(> .modal-content > .ofc-dialog),
+.modal:has(.ofc-dialog) {
+	padding: 0;
+	border-radius: 1px;
+	border: 1px solid #2a2a2a;
+	background: #fff;
+	box-shadow: 0 10px 40px rgba(20, 20, 18, 0.18);
+	max-width: min(540px, 92vw);
+}
+.modal:has(.ofc-dialog) .modal-close-button {
+	display: none;
+}
+.modal:has(.ofc-dialog) .modal-content {
+	padding: 0;
+	margin: 0;
+	background: transparent;
+}
+
+.ofc-dialog {
+	/* Local token scope so the dialog is independent from `.fc`. */
+	--ofc-d-ink: #2a2a2a;
+	--ofc-d-ink-2: #555;
+	--ofc-d-ink-3: #8a8a8a;
+	--ofc-d-paper: #fafaf7;
+	--ofc-d-paper-alt: rgba(0, 0, 0, 0.02);
+	--ofc-d-hair: rgba(0, 0, 0, 0.15);
+	--ofc-d-hair-d: rgba(0, 0, 0, 0.08);
+	--ofc-d-line: #2a2a2a;
+	--ofc-d-accent: #4a5ea8;
+	--ofc-d-accent-bg: rgba(74, 94, 168, 0.1);
+	--ofc-d-sand: #b98a3e;
+	--ofc-d-sand-bg: rgba(185, 138, 62, 0.12);
+	--ofc-d-danger: #b4432b;
+	--ofc-d-ui: "IBM Plex Sans", "Inter Tight", -apple-system,
+		BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+	--ofc-d-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+		Consolas, monospace;
+
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	background: #fff;
+	color: var(--ofc-d-ink);
+	font-family: var(--ofc-d-ui);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.ofc-dialog-header,
+.ofc-dialog-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 18px;
+	gap: 12px;
+}
+.ofc-dialog-header {
+	border-bottom: 1px solid var(--ofc-d-line);
+}
+.ofc-dialog-footer {
+	border-top: 1px solid var(--ofc-d-line);
+	background: rgba(0, 0, 0, 0.015);
+}
+.ofc-dialog-title {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--ofc-d-ink);
+}
+.ofc-dialog-hint {
+	font-family: var(--ofc-d-mono);
+	font-size: 10px;
+	color: var(--ofc-d-ink-3);
+	letter-spacing: 0.4px;
+}
+.ofc-dialog-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+/* ── Type pills ─────────────────────────────────────────── */
+.ofc-pillrow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 14px 18px 0;
+}
+.ofc-pill {
+	border: 1px solid var(--ofc-d-hair);
+	background: #fff;
+	color: var(--ofc-d-ink-2);
+	padding: 5px 10px;
+	font-family: var(--ofc-d-mono);
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.5px;
+	border-radius: 1px;
+	cursor: pointer;
+	transition: color 120ms ease, border-color 120ms ease,
+		background-color 120ms ease;
+}
+.ofc-pill:hover {
+	border-color: var(--ofc-d-ink);
+	color: var(--ofc-d-ink);
+}
+.ofc-pill.is-active {
+	border-color: var(--ofc-d-ink);
+	background: var(--ofc-d-paper);
+	color: var(--ofc-d-ink);
+}
+.ofc-pill.ofc-pill-evt.is-active {
+	border-color: var(--ofc-d-accent);
+	background: var(--ofc-d-accent-bg);
+	color: var(--ofc-d-accent);
+}
+.ofc-pill.ofc-pill-task.is-active {
+	border-color: var(--ofc-d-sand);
+	background: var(--ofc-d-sand-bg);
+	color: var(--ofc-d-sand);
+}
+
+/* ── Body + fields ──────────────────────────────────────── */
+.ofc-dialog-body {
+	padding: 16px 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.ofc-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+.ofc-field-label {
+	font-family: var(--ofc-d-mono);
+	font-size: 10px;
+	letter-spacing: 0.6px;
+	color: var(--ofc-d-ink-2);
+}
+.ofc-grid-2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+.ofc-grid-3 {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: 10px;
+}
+
+.ofc-dialog .ofc-input,
+.ofc-dialog select.ofc-input,
+.ofc-dialog input.ofc-input {
+	border: 1px solid var(--ofc-d-line);
+	background: #fff;
+	padding: 8px 10px;
+	font-family: var(--ofc-d-ui);
+	font-size: 13px;
+	color: var(--ofc-d-ink);
+	border-radius: 1px;
+	width: 100%;
+	box-shadow: none;
+	outline: none;
+	transition: border-color 120ms ease;
+	-webkit-appearance: none;
+	appearance: none;
+	line-height: 1.2;
+	min-height: 34px;
+}
+.ofc-dialog .ofc-input::placeholder {
+	color: var(--ofc-d-ink-3);
+}
+.ofc-dialog .ofc-input:focus {
+	border-color: var(--ofc-d-accent);
+	box-shadow: inset 0 0 0 1px var(--ofc-d-accent);
+}
+.ofc-dialog .ofc-input-mono,
+.ofc-dialog input[type="date"].ofc-input,
+.ofc-dialog input[type="time"].ofc-input {
+	font-family: var(--ofc-d-mono);
+	font-size: 12px;
+	letter-spacing: 0.2px;
+}
+.ofc-dialog .ofc-input-readonly {
+	background: var(--ofc-d-paper);
+	color: var(--ofc-d-ink-2);
+	user-select: none;
+	display: flex;
+	align-items: center;
+}
+.ofc-dialog input[type="date"].ofc-input::-webkit-calendar-picker-indicator,
+.ofc-dialog input[type="time"].ofc-input::-webkit-calendar-picker-indicator {
+	filter: grayscale(1) opacity(0.5);
+	cursor: pointer;
+}
+
+/* ── Day-of-week chips (recurring) ───────────────────────── */
+.ofc-dayrow {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+.ofc-daychip {
+	border: 1px solid var(--ofc-d-hair);
+	background: #fff;
+	color: var(--ofc-d-ink-2);
+	font-family: var(--ofc-d-mono);
+	font-size: 10px;
+	letter-spacing: 0.3px;
+	padding: 6px 10px;
+	border-radius: 1px;
+	cursor: pointer;
+	min-width: 42px;
+	transition: color 120ms ease, border-color 120ms ease,
+		background-color 120ms ease;
+}
+.ofc-daychip:hover {
+	border-color: var(--ofc-d-ink);
+	color: var(--ofc-d-ink);
+}
+.ofc-daychip.is-active {
+	border-color: var(--ofc-d-accent);
+	background: var(--ofc-d-accent-bg);
+	color: var(--ofc-d-accent);
+}
+
+/* ── Checkbox row (task completion) ──────────────────────── */
+.ofc-checkbox-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-family: var(--ofc-d-ui);
+	font-size: 12px;
+	color: var(--ofc-d-ink-2);
+	cursor: pointer;
+}
+.ofc-checkbox-row input[type="checkbox"] {
+	margin: 0;
+	accent-color: var(--ofc-d-accent);
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.ofc-dialog .ofc-btn {
+	border: 1px solid var(--ofc-d-line);
+	background: #fff;
+	color: var(--ofc-d-ink);
+	font-family: var(--ofc-d-ui);
+	font-size: 13px;
+	font-weight: 500;
+	letter-spacing: -0.1px;
+	padding: 7px 16px;
+	border-radius: 1px;
+	cursor: pointer;
+	box-shadow: none;
+	transition: background-color 120ms ease, color 120ms ease,
+		border-color 120ms ease;
+	min-height: 32px;
+}
+.ofc-dialog .ofc-btn:hover {
+	background: var(--ofc-d-paper);
+}
+.ofc-dialog .ofc-btn-ghost {
+	border-color: var(--ofc-d-hair);
+	color: var(--ofc-d-ink-2);
+}
+.ofc-dialog .ofc-btn-ghost:hover {
+	border-color: var(--ofc-d-ink);
+	color: var(--ofc-d-ink);
+}
+.ofc-dialog .ofc-btn-primary {
+	border-color: var(--ofc-d-accent);
+	background: var(--ofc-d-accent);
+	color: #fff;
+}
+.ofc-dialog .ofc-btn-primary:hover {
+	background: #3b4e92;
+	border-color: #3b4e92;
+}
+.ofc-dialog .ofc-btn-danger {
+	border-color: var(--ofc-d-danger);
+	color: var(--ofc-d-danger);
+	background: #fff;
+	margin-right: auto;
+}
+.ofc-dialog .ofc-btn-danger:hover {
+	background: var(--ofc-d-danger);
+	color: #fff;
 }

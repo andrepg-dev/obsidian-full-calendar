@@ -25,6 +25,7 @@ export function launchCreateModal(
             initialEvent: partialEvent,
             calendars,
             defaultCalendarIndex: 0,
+            cancel: closeModal,
             submit: async (data, calendarIndex) => {
                 const calendarId = calendars[calendarIndex].id;
                 try {
@@ -65,6 +66,7 @@ export function launchEditModal(plugin: FullCalendarPlugin, eventId: string) {
             initialEvent: eventToEdit,
             calendars,
             defaultCalendarIndex: calIdx,
+            cancel: closeModal,
             submit: async (data, calendarIndex) => {
                 try {
                     if (calendarIndex !== calIdx) {
