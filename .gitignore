@@ -17,6 +17,9 @@ main.js
 styles.css
 main.css
 
+# Generated Tailwind CSS — built from src/ui/tailwind.src.css
+src/ui/tailwind.gen.css
+
 # Exclude sourcemaps
 *.map
 

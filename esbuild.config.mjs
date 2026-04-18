@@ -1,5 +1,6 @@
 import esbuild from "esbuild";
 import process from "process";
+import fs from "fs";
 import builtins from "builtin-modules";
 
 const banner = `/*
@@ -9,6 +10,15 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const prod = process.argv[2] === "production";
+
+// Obsidian only auto-loads styles.css from the plugin folder, but esbuild
+// emits the bundled stylesheet as main.css. Mirror it after every build so
+// the dev loop picks up CSS without a manual rename.
+const mirrorStylesheet = () => {
+	if (fs.existsSync("main.css")) {
+		fs.copyFileSync("main.css", "styles.css");
+	}
+};
 
 esbuild
 	.build({
@@ -44,11 +54,22 @@ esbuild
 			...builtins,
 		],
 		format: "cjs",
-		watch: !prod,
+		watch: prod
+			? false
+			: {
+					onRebuild(error) {
+						if (error) {
+							console.error("esbuild rebuild failed:", error);
+							return;
+						}
+						mirrorStylesheet();
+					},
+			  },
 		target: "es2016",
 		logLevel: "info",
 		sourcemap: prod ? false : "inline",
 		treeShaking: true,
 		outfile: "main.js",
 	})
+	.then(mirrorStylesheet)
 	.catch(() => process.exit(1));
