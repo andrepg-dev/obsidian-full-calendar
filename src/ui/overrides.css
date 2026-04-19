@@ -12,7 +12,7 @@
 
 .fc {
 	/* ── Design tokens ───────────────────────────────────── */
-	--ofc-paper: #fafaf7;
+	--ofc-paper: #fff;
 	--ofc-paper-alt: #fff;
 	--ofc-ink: #2a2a2a;
 	--ofc-ink-2: #555;
@@ -213,7 +213,7 @@
 	position: absolute;
 	inset: 0;
 	background: var(--fc-event-bg-color, var(--ofc-accent));
-	opacity: 0.12;
+	opacity: 0.18;
 	pointer-events: none;
 	z-index: 0;
 }

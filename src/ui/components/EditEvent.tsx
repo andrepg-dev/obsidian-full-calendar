@@ -215,38 +215,6 @@ export const EditEvent = ({
                 <button
                     type="button"
                     className={
-                        "ofc-pill ofc-pill-evt" + (!isTask ? " is-active" : "")
-                    }
-                    onClick={() => setIsTask(false)}
-                >
-                    ▪ MEETING
-                </button>
-                <button
-                    type="button"
-                    className={
-                        "ofc-pill ofc-pill-task" + (isTask ? " is-active" : "")
-                    }
-                    onClick={() => {
-                        setIsTask(true);
-                        if (complete === false || complete === undefined) {
-                            setComplete(false);
-                        }
-                    }}
-                >
-                    ▪ FOCUS BLOCK
-                </button>
-                <button
-                    type="button"
-                    className={
-                        "ofc-pill" + (allDay ? " is-active" : "")
-                    }
-                    onClick={() => setAllDay((v) => !v)}
-                >
-                    ▪ ALL-DAY
-                </button>
-                <button
-                    type="button"
-                    className={
                         "ofc-pill" + (isRecurring ? " is-active" : "")
                     }
                     onClick={() => setIsRecurring((v) => !v)}
