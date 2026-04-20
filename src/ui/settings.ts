@@ -27,6 +27,8 @@ export interface FullCalendarSettings {
     };
     timeFormat24h: boolean;
     clickToCreateEventFromMonthView: boolean;
+    googleClientId: string;
+    googleClientSecret: string;
 }
 
 export const DEFAULT_SETTINGS: FullCalendarSettings = {
@@ -39,6 +41,8 @@ export const DEFAULT_SETTINGS: FullCalendarSettings = {
     },
     timeFormat24h: false,
     clickToCreateEventFromMonthView: true,
+    googleClientId: "",
+    googleClientSecret: "",
 };
 
 const WEEKDAYS = [
@@ -86,6 +90,7 @@ export function addCalendarButton(
                 (dropdown = d.addOptions({
                     local: "Full note",
                     dailynote: "Daily Note",
+                    google: "Google Calendar",
                     icloud: "iCloud",
                     caldav: "CalDAV",
                     ical: "Remote (.ics format)",
@@ -132,6 +137,10 @@ export function addCalendarButton(
                             (dir) => usedDirectories.indexOf(dir) === -1
                         ),
                         headings,
+                        googleOAuthClient: {
+                            clientId: plugin.settings.googleClientId,
+                            clientSecret: plugin.settings.googleClientSecret,
+                        },
                         submit: async (source: CalendarInfo) => {
                             if (source.type === "caldav") {
                                 try {
@@ -246,6 +255,8 @@ export class FullCalendarSettingTab extends PluginSettingTab {
                 });
             });
 
+        this.renderGoogleCredentialsSection(containerEl);
+
         containerEl.createEl("h2", { text: "Manage Calendars" });
         addCalendarButton(
             this.app,
@@ -272,5 +283,89 @@ export class FullCalendarSettingTab extends PluginSettingTab {
             }),
             sourcesDiv
         );
+    }
+
+    private renderGoogleCredentialsSection(containerEl: HTMLElement): void {
+        containerEl.createEl("h2", { text: "Google Calendar" });
+
+        const description = containerEl.createDiv({
+            cls: "setting-item-description",
+        });
+        description.style.marginBottom = "0.75rem";
+        description.createEl("p", {
+            text: "Google Calendar sync requires your own OAuth credentials because Google classifies calendar access as a restricted scope. Each user must create a personal Google Cloud project — this takes about 5 minutes and is free.",
+        });
+
+        const details = containerEl.createEl("details");
+        details.createEl("summary", {
+            text: "Step-by-step setup (click to expand)",
+        });
+        const steps = details.createEl("ol");
+        steps.style.paddingLeft = "1.5rem";
+        steps.style.lineHeight = "1.6";
+
+        const step = (html: string) => {
+            const li = steps.createEl("li");
+            li.innerHTML = html;
+        };
+
+        step(
+            'Go to <a href="https://console.cloud.google.com/projectcreate" target="_blank">console.cloud.google.com</a> and create a new project (any name).'
+        );
+        step(
+            'Open <b>APIs &amp; Services → Library</b>, search for <b>Google Calendar API</b>, and click <b>Enable</b>.'
+        );
+        step(
+            'Open <b>APIs &amp; Services → OAuth consent screen</b>. Pick <b>External</b>, then fill in the required fields (app name, your email, developer email). You can leave everything else blank.'
+        );
+        step(
+            'In the <b>Scopes</b> step, click <b>Add or remove scopes</b> and add <code>.../auth/calendar</code>. Save.'
+        );
+        step(
+            'In the <b>Test users</b> step, add the Gmail account you want to sync. Save.'
+        );
+        step(
+            'Open <b>APIs &amp; Services → Credentials → Create credentials → OAuth client ID</b>. Choose <b>Desktop app</b> as the application type. Click Create.'
+        );
+        step(
+            'Copy the <b>Client ID</b> and <b>Client secret</b> from the dialog into the two fields below.'
+        );
+        step(
+            'Scroll down to <b>Manage Calendars</b>, pick <b>Google Calendar</b> from the dropdown and click <b>+</b>, then click <b>Connect</b>.'
+        );
+
+        const notes = details.createEl("div");
+        notes.style.marginTop = "0.5rem";
+        notes.createEl("p", {
+            text: "Notes: while the project stays in Testing mode, Google refresh tokens expire every 7 days — you'll need to reconnect. Publishing to Production lets refresh tokens last indefinitely but requires Google's verification review.",
+        });
+
+        new Setting(containerEl)
+            .setName("OAuth Client ID")
+            .setDesc("Ends in .apps.googleusercontent.com")
+            .addText((t) =>
+                t
+                    .setPlaceholder("123456789-xxxxxxx.apps.googleusercontent.com")
+                    .setValue(this.plugin.settings.googleClientId)
+                    .onChange(async (value) => {
+                        this.plugin.settings.googleClientId = value.trim();
+                        await this.plugin.saveData(this.plugin.settings);
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName("OAuth Client Secret")
+            .setDesc(
+                "Stored in this vault's data.json. If you sync your vault to another device, the secret travels with it."
+            )
+            .addText((t) => {
+                t.setPlaceholder("GOCSPX-…")
+                    .setValue(this.plugin.settings.googleClientSecret)
+                    .onChange(async (value) => {
+                        this.plugin.settings.googleClientSecret = value.trim();
+                        await this.plugin.saveData(this.plugin.settings);
+                    });
+                t.inputEl.type = "password";
+            });
     }
 }

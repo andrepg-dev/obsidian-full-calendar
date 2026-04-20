@@ -13,6 +13,15 @@ const calendarOptionsSchema = z.discriminatedUnion("type", [
         username: z.string(),
         password: z.string(),
     }),
+    z.object({
+        type: z.literal("google"),
+        accountEmail: z.string(),
+        calendarId: z.string(),
+        calendarSummary: z.string(),
+        refreshToken: z.string(),
+        accessToken: z.string().optional(),
+        accessTokenExpiresAt: z.number().optional(),
+    }),
 ]);
 
 const colorValidator = z.object({ color: z.string() });
@@ -67,7 +76,7 @@ export function makeDefaultPartialCalendarSource(
     }
 
     return {
-        type: type,
+        type: type as CalendarInfo["type"],
         color: getComputedStyle(document.body)
             .getPropertyValue("--interactive-accent")
             .trim(),

@@ -109,6 +109,19 @@ export function renderCalendar(
         scrollTimeReset: false,
         dayMaxEvents: true,
 
+        dayHeaderContent: (arg) => {
+            if (arg.view.type.startsWith("timeGrid")) {
+                const weekday = arg.date
+                    .toLocaleDateString(undefined, { weekday: "short" })
+                    .toUpperCase();
+                const day = arg.date.getDate();
+                return {
+                    html: `<div class="ofc-dayhead"><span class="ofc-dayhead-weekday">${weekday}</span><span class="ofc-dayhead-date">${day}</span></div>`,
+                };
+            }
+            return undefined;
+        },
+
         headerToolbar: !isNarrow
             ? {
                   left: "prev,next today",

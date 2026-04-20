@@ -14,12 +14,10 @@ export async function openFileForEvent(
     id: string
 ) {
     const details = cache.getInfoForEditableEvent(id);
-    if (!details) {
+    if (!details.location) {
         throw new Error("Event does not have local representation.");
     }
-    const {
-        location: { path, lineNumber },
-    } = details;
+    const { path, lineNumber } = details.location;
     let leaf = workspace.getMostRecentLeaf();
     const file = vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {

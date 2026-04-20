@@ -306,11 +306,6 @@ export default class DailyNoteCalendar extends EditableCalendar {
         const headingInfo = metadata.headings?.find(
             (h) => h.heading == this.heading
         );
-        if (!headingInfo) {
-            throw new Error(
-                `Could not find heading ${this.heading} in daily note ${file.path}.`
-            );
-        }
         let lineNumber = await this.app.rewrite(file, (contents) => {
             const { page, lineNumber } = addToHeading(contents, {
                 heading: headingInfo,
@@ -388,11 +383,6 @@ export default class DailyNoteCalendar extends EditableCalendar {
             const headingInfo = metadata.headings?.find(
                 (h) => h.heading == this.heading
             );
-            if (!headingInfo) {
-                throw new Error(
-                    `Could not find heading ${this.heading} in daily note ${file.path}.`
-                );
-            }
 
             await this.app.rewrite(file, async (oldFileContents) => {
                 // Open the old file and remove the event.

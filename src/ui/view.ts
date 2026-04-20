@@ -1,4 +1,5 @@
 import "./overrides.css";
+import "./tailwind.gen.css";
 import { ItemView, Menu, Notice, WorkspaceLeaf } from "obsidian";
 import { Calendar, EventSourceInput } from "@fullcalendar/core";
 import { renderCalendar } from "./calendar";
