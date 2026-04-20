@@ -19,6 +19,9 @@ import FullNoteCalendar from "./calendars/FullNoteCalendar";
 import DailyNoteCalendar from "./calendars/DailyNoteCalendar";
 import ICSCalendar from "./calendars/ICSCalendar";
 import CalDAVCalendar from "./calendars/CalDAVCalendar";
+import GoogleCalendar, {
+    GoogleTokenPersistPayload,
+} from "./calendars/GoogleCalendar";
 
 export default class FullCalendarPlugin extends Plugin {
     settings: FullCalendarSettings = DEFAULT_SETTINGS;
@@ -54,6 +57,30 @@ export default class FullCalendarPlugin extends Plugin {
                       info.url,
                       info.homeUrl
                   )
+                : null,
+        google: (info) =>
+            info.type === "google"
+                ? new GoogleCalendar({
+                      color: info.color,
+                      accountEmail: info.accountEmail,
+                      calendarId: info.calendarId,
+                      calendarSummary: info.calendarSummary,
+                      initialTokens: {
+                          refreshToken: info.refreshToken,
+                          accessToken: info.accessToken,
+                          expiresAt: info.accessTokenExpiresAt,
+                      },
+                      getOAuthClient: () => ({
+                          clientId: this.settings.googleClientId,
+                          clientSecret: this.settings.googleClientSecret,
+                      }),
+                      persistTokens: (payload) =>
+                          this.persistGoogleTokens(
+                              info.accountEmail,
+                              info.calendarId,
+                              payload
+                          ),
+                  })
                 : null,
         FOR_TEST_ONLY: () => null,
     });
@@ -208,5 +235,48 @@ export default class FullCalendarPlugin extends Plugin {
         this.cache.reset(this.settings.calendarSources);
         await this.cache.populate();
         this.cache.resync();
+    }
+
+    /**
+     * Persist a refreshed Google access token without resetting the event cache.
+     * Called by GoogleCalendar instances whenever they refresh.
+     */
+    persistGoogleTokens(
+        accountEmail: string,
+        calendarId: string,
+        payload: GoogleTokenPersistPayload
+    ): void {
+        let dirty = false;
+        this.settings.calendarSources = this.settings.calendarSources.map(
+            (src) => {
+                if (
+                    src.type === "google" &&
+                    src.accountEmail === accountEmail &&
+                    src.calendarId === calendarId
+                ) {
+                    dirty = true;
+                    return {
+                        ...src,
+                        accessToken: payload.accessToken,
+                        accessTokenExpiresAt: payload.expiresAt,
+                        ...(payload.refreshToken
+                            ? { refreshToken: payload.refreshToken }
+                            : {}),
+                    };
+                }
+                return src;
+            }
+        );
+        if (dirty) {
+            // Fire-and-forget: a token refresh that fails to persist still
+            // works in-memory; we just log the error so the next refresh isn't
+            // blocked.
+            this.saveData(this.settings).catch((err) =>
+                console.error(
+                    "Full Calendar: failed to persist refreshed Google token",
+                    err
+                )
+            );
+        }
     }
 }

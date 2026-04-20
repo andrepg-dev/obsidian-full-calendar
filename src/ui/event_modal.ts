@@ -1,6 +1,7 @@
 import { Notice } from "obsidian";
 import * as React from "react";
 import { EditableCalendar } from "src/calendars/EditableCalendar";
+import WritableRemoteCalendar from "src/calendars/WritableRemoteCalendar";
 import FullCalendarPlugin from "src/main";
 import { OFCEvent } from "src/types";
 import { openFileForEvent } from "./actions";
@@ -12,7 +13,11 @@ export function launchCreateModal(
     partialEvent: Partial<OFCEvent>
 ) {
     const calendars = [...plugin.cache.calendars.entries()]
-        .filter(([_, cal]) => cal instanceof EditableCalendar)
+        .filter(
+            ([_, cal]) =>
+                cal instanceof EditableCalendar ||
+                cal instanceof WritableRemoteCalendar
+        )
         .map(([id, cal]) => {
             return {
                 id,
@@ -50,7 +55,11 @@ export function launchEditModal(plugin: FullCalendarPlugin, eventId: string) {
     const calId = plugin.cache.getInfoForEditableEvent(eventId).calendar.id;
 
     const calendars = [...plugin.cache.calendars.entries()]
-        .filter(([_, cal]) => cal instanceof EditableCalendar)
+        .filter(
+            ([_, cal]) =>
+                cal instanceof EditableCalendar ||
+                cal instanceof WritableRemoteCalendar
+        )
         .map(([id, cal]) => {
             return {
                 id,

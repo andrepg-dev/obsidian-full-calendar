@@ -112,6 +112,32 @@ function Username<T extends Partial<CalendarInfo>>({ source }: BasicProps<T>) {
     );
 }
 
+function GoogleSetting<T extends Partial<CalendarInfo>>({
+    source,
+}: BasicProps<T>) {
+    let g = source as SourceWith<
+        T,
+        { calendarSummary: undefined; accountEmail: undefined }
+    >;
+    return (
+        <div
+            className="setting-item-control"
+            style={{ display: "block", textAlign: "center" }}
+        >
+            <input
+                disabled
+                type="text"
+                value={`${g.calendarSummary} — ${g.accountEmail}`}
+                style={{
+                    width: "100%",
+                    marginLeft: 4,
+                    marginRight: 4,
+                }}
+            />
+        </div>
+    );
+}
+
 interface CalendarSettingsProps {
     setting: Partial<CalendarInfo>;
     onColorChange: (s: string) => void;
@@ -137,6 +163,8 @@ export const CalendarSettingRow = ({
                 <DirectorySetting source={setting} />
             ) : setting.type === "dailynote" ? (
                 <HeadingSetting source={setting} />
+            ) : setting.type === "google" ? (
+                <GoogleSetting source={setting} />
             ) : (
                 <UrlSetting source={setting} />
             )}

@@ -195,7 +195,11 @@ export const EditEvent = ({
     };
 
     const editableCalendars = calendars.flatMap((cal) =>
-        cal.type === "local" || cal.type === "dailynote" ? [cal] : []
+        cal.type === "local" ||
+        cal.type === "dailynote" ||
+        cal.type === "google"
+            ? [cal]
+            : []
     );
 
     return (
@@ -347,7 +351,9 @@ export const EditEvent = ({
                                 >
                                     {cal.type === "local"
                                         ? cal.name
-                                        : "Daily Note"}
+                                        : cal.type === "google"
+                                          ? cal.name
+                                          : "Daily Note"}
                                 </option>
                             ))}
                         </select>

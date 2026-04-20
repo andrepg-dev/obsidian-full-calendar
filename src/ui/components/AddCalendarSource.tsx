@@ -1,6 +1,17 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Notice, Platform } from "obsidian";
 import { CalendarInfo } from "../../types";
+import {
+    GoogleOAuthClient,
+    GoogleTokenSet,
+    hasGoogleCredentials,
+    runGoogleOAuthFlow,
+} from "../../calendars/parsing/google/auth";
+import {
+    GoogleCalendarListEntry,
+    listCalendars,
+} from "../../calendars/parsing/google/api";
 
 type ChangeListener = <T extends Partial<CalendarInfo>>(
     fromString: (val: string) => T
@@ -216,10 +227,237 @@ function PasswordInput<T extends Partial<CalendarInfo>>({
     );
 }
 
+interface GoogleConnectProps {
+    color: string;
+    oauthClient: GoogleOAuthClient;
+    submit: (source: CalendarInfo) => Promise<void>;
+}
+
+const GoogleConnect = ({ color, oauthClient, submit }: GoogleConnectProps) => {
+    const credentialsConfigured = hasGoogleCredentials(oauthClient);
+    const onMobile = Platform.isMobile;
+
+    const [tokens, setTokens] = useState<GoogleTokenSet | null>(null);
+    const [calendars, setCalendars] = useState<GoogleCalendarListEntry[]>([]);
+    const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
+    const [pickedColor, setPickedColor] = useState(color);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!tokens) return;
+        let cancelled = false;
+        (async () => {
+            setBusy(true);
+            try {
+                const list = await listCalendars(tokens.accessToken);
+                if (cancelled) return;
+                setCalendars(list);
+                const primary = list.find((c) => c.primary) || list[0];
+                if (primary) setSelectedCalendarId(primary.id);
+            } catch (err) {
+                if (cancelled) return;
+                const msg =
+                    err instanceof Error ? err.message : String(err);
+                setError(msg);
+            } finally {
+                if (!cancelled) setBusy(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [tokens]);
+
+    if (onMobile) {
+        return (
+            <div className="setting-item">
+                <div className="setting-item-info">
+                    <div className="setting-item-name">
+                        Google Calendar (desktop only)
+                    </div>
+                    <div className="setting-item-description">
+                        The OAuth sign-in flow requires a local network
+                        listener that is not available on Obsidian mobile.
+                        Connect from a desktop vault and the calendar will
+                        sync once Obsidian Sync brings it to your phone.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!credentialsConfigured) {
+        return (
+            <div className="setting-item">
+                <div className="setting-item-info">
+                    <div className="setting-item-name">
+                        Google credentials required
+                    </div>
+                    <div className="setting-item-description">
+                        Scroll up to the <b>Google Calendar</b> section of
+                        this settings tab and paste your OAuth Client ID and
+                        Client Secret. The step-by-step setup is in the
+                        collapsible there.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const handleConnect = async () => {
+        setError(null);
+        setBusy(true);
+        try {
+            const result = await runGoogleOAuthFlow(oauthClient);
+            setTokens(result);
+            new Notice(`Connected to Google as ${result.email}`);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            setError(msg);
+            new Notice(msg);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleAdd = async () => {
+        if (!tokens || !selectedCalendarId) return;
+        const chosen = calendars.find((c) => c.id === selectedCalendarId);
+        if (!chosen) return;
+        setBusy(true);
+        try {
+            await submit({
+                type: "google",
+                color: pickedColor,
+                accountEmail: tokens.email,
+                calendarId: chosen.id,
+                calendarSummary: chosen.summary,
+                refreshToken: tokens.refreshToken,
+                accessToken: tokens.accessToken,
+                accessTokenExpiresAt: tokens.expiresAt,
+            });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div>
+            {!tokens ? (
+                <div className="setting-item">
+                    <div className="setting-item-info">
+                        <div className="setting-item-name">
+                            Sign in with Google
+                        </div>
+                        <div className="setting-item-description">
+                            Opens your browser for the OAuth consent screen.
+                            The plugin requests access to read and write
+                            calendar events.
+                        </div>
+                    </div>
+                    <div className="setting-item-control">
+                        <button
+                            type="button"
+                            className="mod-cta"
+                            disabled={busy}
+                            onClick={handleConnect}
+                        >
+                            {busy ? "Waiting for browser…" : "Connect"}
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    <div className="setting-item">
+                        <div className="setting-item-info">
+                            <div className="setting-item-name">Account</div>
+                            <div className="setting-item-description">
+                                {tokens.email}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-item-info">
+                            <div className="setting-item-name">Calendar</div>
+                            <div className="setting-item-description">
+                                Pick which calendar to sync into Full
+                                Calendar.
+                            </div>
+                        </div>
+                        <div className="setting-item-control">
+                            <select
+                                required
+                                value={selectedCalendarId}
+                                disabled={busy || calendars.length === 0}
+                                onChange={(e) =>
+                                    setSelectedCalendarId(e.target.value)
+                                }
+                            >
+                                {calendars.length === 0 && (
+                                    <option value="" disabled>
+                                        Loading calendars…
+                                    </option>
+                                )}
+                                {calendars.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.summary}
+                                        {c.primary ? " (primary)" : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-item-info">
+                            <div className="setting-item-name">Color</div>
+                            <div className="setting-item-description">
+                                Color used in the Full Calendar view.
+                            </div>
+                        </div>
+                        <div className="setting-item-control">
+                            <input
+                                type="color"
+                                value={pickedColor}
+                                style={{ maxWidth: "25%", minWidth: "3rem" }}
+                                onChange={(e) =>
+                                    setPickedColor(e.target.value)
+                                }
+                            />
+                        </div>
+                    </div>
+                    <div className="setting-item">
+                        <div className="setting-item-info" />
+                        <div className="setting-control">
+                            <button
+                                type="button"
+                                className="mod-cta"
+                                disabled={busy || !selectedCalendarId}
+                                onClick={handleAdd}
+                            >
+                                {busy ? "Adding…" : "Add Calendar"}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+            {error && (
+                <div
+                    className="setting-item-description"
+                    style={{ color: "var(--text-error)" }}
+                >
+                    {error}
+                </div>
+            )}
+        </div>
+    );
+};
+
 interface AddCalendarProps {
     source: Partial<CalendarInfo>;
     directories: string[];
     headings: string[];
+    googleOAuthClient: GoogleOAuthClient;
     submit: (source: CalendarInfo) => Promise<void>;
 }
 
@@ -227,8 +465,21 @@ export const AddCalendarSource = ({
     source,
     directories,
     headings,
+    googleOAuthClient,
     submit,
 }: AddCalendarProps) => {
+    if (source.type === "google") {
+        return (
+            <div className="vertical-tab-content">
+                <GoogleConnect
+                    color={source.color || "#3b82f6"}
+                    oauthClient={googleOAuthClient}
+                    submit={submit}
+                />
+            </div>
+        );
+    }
+
     const isCalDAV = source.type === "caldav";
 
     const [setting, setSettingState] = useState(source);

@@ -6,6 +6,7 @@ import { EditableCalendar } from "../calendars/EditableCalendar";
 import EventStore, { StoredEvent } from "./EventStore";
 import { CalendarInfo, OFCEvent, validateEvent } from "../types";
 import RemoteCalendar from "../calendars/RemoteCalendar";
+import WritableRemoteCalendar from "../calendars/WritableRemoteCalendar";
 import FullNoteCalendar from "../calendars/FullNoteCalendar";
 
 export type CalendarInitializerMap = Record<
@@ -191,7 +192,10 @@ export default class EventCache {
             return false;
         }
         const cal = this.getCalendarById(calId);
-        return cal instanceof EditableCalendar;
+        return (
+            cal instanceof EditableCalendar ||
+            cal instanceof WritableRemoteCalendar
+        );
     }
 
     getEventById(s: string): OFCEvent | null {
@@ -208,7 +212,10 @@ export default class EventCache {
      * @param eventId ID of event in question.
      * @returns Calendar and location for an event.
      */
-    getInfoForEditableEvent(eventId: string) {
+    getInfoForEditableEvent(eventId: string): {
+        calendar: EditableCalendar | WritableRemoteCalendar;
+        location: { path: string; lineNumber: number | undefined } | null;
+    } {
         const details = this.store.getEventDetails(eventId);
         if (!details) {
             throw new Error(`Event ID ${eventId} not present in event store.`);
@@ -218,16 +225,18 @@ export default class EventCache {
         if (!calendar) {
             throw new Error(`Calendar ID ${calendarId} is not registered.`);
         }
-        if (!(calendar instanceof EditableCalendar)) {
-            // console.warn("Cannot modify event of type " + calendar.type);
-            throw new Error(`Read-only events cannot be modified.`);
+        if (calendar instanceof EditableCalendar) {
+            if (!location) {
+                throw new Error(
+                    `Event with ID ${eventId} does not have a location in the Vault.`
+                );
+            }
+            return { calendar, location };
         }
-        if (!location) {
-            throw new Error(
-                `Event with ID ${eventId} does not have a location in the Vault.`
-            );
+        if (calendar instanceof WritableRemoteCalendar) {
+            return { calendar, location: null };
         }
-        return { calendar, location };
+        throw new Error(`Read-only events cannot be modified.`);
     }
 
     ///
@@ -299,22 +308,36 @@ export default class EventCache {
         if (!calendar) {
             throw new Error(`Calendar ID ${calendarId} is not registered.`);
         }
-        if (!(calendar instanceof EditableCalendar)) {
-            console.error(
-                `Event cannot be added to non-editable calendar of type ${calendar.type}`
-            );
-            throw new Error(`Cannot add event to a read-only calendar`);
+        if (calendar instanceof EditableCalendar) {
+            const location = await calendar.createEvent(event);
+            const id = this.store.add({
+                calendar,
+                location,
+                id: event.id || this.generateId(),
+                event,
+            });
+            this.updateViews([], [{ event, id, calendarId: calendar.id }]);
+            return true;
         }
-        const location = await calendar.createEvent(event);
-        const id = this.store.add({
-            calendar,
-            location,
-            id: event.id || this.generateId(),
-            event,
-        });
-
-        this.updateViews([], [{ event, id, calendarId: calendar.id }]);
-        return true;
+        if (calendar instanceof WritableRemoteCalendar) {
+            const remoteId = await calendar.createRemoteEvent(event);
+            const storedEvent = { ...event, id: remoteId };
+            const id = this.store.add({
+                calendar,
+                location: null,
+                id: remoteId,
+                event: storedEvent,
+            });
+            this.updateViews(
+                [],
+                [{ event: storedEvent, id, calendarId: calendar.id }]
+            );
+            return true;
+        }
+        console.error(
+            `Event cannot be added to non-editable calendar of type ${calendar.type}`
+        );
+        throw new Error(`Cannot add event to a read-only calendar`);
     }
 
     /**
@@ -322,10 +345,34 @@ export default class EventCache {
      * @param eventId ID of event to be deleted.
      */
     async deleteEvent(eventId: string): Promise<void> {
-        const { calendar, location } = this.getInfoForEditableEvent(eventId);
-        this.store.delete(eventId);
-        await calendar.deleteEvent(location);
-        this.updateViews([eventId], []);
+        const details = this.store.getEventDetails(eventId);
+        if (!details) {
+            throw new Error(`Event ID ${eventId} not present in event store.`);
+        }
+        const calendar = this.calendars.get(details.calendarId);
+        if (!calendar) {
+            throw new Error(
+                `Calendar ID ${details.calendarId} is not registered.`
+            );
+        }
+        if (calendar instanceof EditableCalendar) {
+            if (!details.location) {
+                throw new Error(
+                    `Event with ID ${eventId} does not have a location in the Vault.`
+                );
+            }
+            this.store.delete(eventId);
+            await calendar.deleteEvent(details.location);
+            this.updateViews([eventId], []);
+            return;
+        }
+        if (calendar instanceof WritableRemoteCalendar) {
+            this.store.delete(eventId);
+            await calendar.deleteRemoteEvent(eventId);
+            this.updateViews([eventId], []);
+            return;
+        }
+        throw new Error("Read-only events cannot be deleted.");
     }
 
     /**
@@ -338,30 +385,66 @@ export default class EventCache {
         eventId: string,
         newEvent: OFCEvent
     ): Promise<boolean> {
-        const { calendar, location: oldLocation } =
-            this.getInfoForEditableEvent(eventId);
-        const { path, lineNumber } = oldLocation;
+        const details = this.store.getEventDetails(eventId);
+        if (!details) {
+            throw new Error(`Event ID ${eventId} not present in event store.`);
+        }
+        const calendar = this.calendars.get(details.calendarId);
+        if (!calendar) {
+            throw new Error(
+                `Calendar ID ${details.calendarId} is not registered.`
+            );
+        }
         console.debug("updating event with ID", eventId);
 
-        await calendar.modifyEvent(
-            { path, lineNumber },
-            newEvent,
-            (newLocation) => {
-                this.store.delete(eventId);
-                this.store.add({
-                    calendar,
-                    location: newLocation,
-                    id: eventId,
-                    event: newEvent,
-                });
+        if (calendar instanceof EditableCalendar) {
+            if (!details.location) {
+                throw new Error(
+                    `Event with ID ${eventId} does not have a location in the Vault.`
+                );
             }
-        );
-
-        this.updateViews(
-            [eventId],
-            [{ id: eventId, calendarId: calendar.id, event: newEvent }]
-        );
-        return true;
+            const { path, lineNumber } = details.location;
+            await calendar.modifyEvent(
+                { path, lineNumber },
+                newEvent,
+                (newLocation) => {
+                    this.store.delete(eventId);
+                    this.store.add({
+                        calendar,
+                        location: newLocation,
+                        id: eventId,
+                        event: newEvent,
+                    });
+                }
+            );
+            this.updateViews(
+                [eventId],
+                [{ id: eventId, calendarId: calendar.id, event: newEvent }]
+            );
+            return true;
+        }
+        if (calendar instanceof WritableRemoteCalendar) {
+            await calendar.updateRemoteEvent(eventId, newEvent);
+            this.store.delete(eventId);
+            this.store.add({
+                calendar,
+                location: null,
+                id: eventId,
+                event: { ...newEvent, id: eventId },
+            });
+            this.updateViews(
+                [eventId],
+                [
+                    {
+                        id: eventId,
+                        calendarId: calendar.id,
+                        event: { ...newEvent, id: eventId },
+                    },
+                ]
+            );
+            return true;
+        }
+        throw new Error("Read-only events cannot be modified.");
     }
 
     /**
