@@ -23,6 +23,7 @@ import {
     unmakeTask,
 } from "src/ui/tasks";
 import { UpdateViewCallback } from "src/core/EventCache";
+import { deleteContextMenuEvent } from "./context_menu_actions";
 
 export const FULL_CALENDAR_VIEW_TYPE = "full-calendar-view";
 export const FULL_CALENDAR_SIDEBAR_VIEW_TYPE = "full-calendar-sidebar-view";
@@ -609,8 +610,23 @@ export class CalendarView extends ItemView {
                             if (!this.plugin.cache) {
                                 return;
                             }
-                            await this.plugin.cache.deleteEvent(e.id);
-                            new Notice(`Deleted event "${e.title}".`);
+                            try {
+                                const deleted = await deleteContextMenuEvent(
+                                    this.plugin.cache,
+                                    e.id,
+                                    occurrenceDate
+                                );
+                                new Notice(
+                                    deleted === "occurrence"
+                                        ? `Deleted this occurrence of "${e.title}".`
+                                        : `Deleted event "${e.title}".`
+                                );
+                            } catch (err: any) {
+                                console.error(err);
+                                new Notice(
+                                    err?.message ?? "Could not delete event."
+                                );
+                            }
                         })
                     );
                 } else {

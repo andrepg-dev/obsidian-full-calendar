@@ -55,9 +55,12 @@ interface ExtraRenderProps {
     selectedEventIds?: Set<string>;
 }
 
-const toDuration = (raw: number | undefined) => {
+const toMinutes = (raw: number | undefined) => {
     if (!raw || raw <= 0) return undefined;
-    const m = Math.max(1, Math.min(60, Math.floor(raw)));
+    return Math.max(1, Math.min(60, Math.floor(raw)));
+};
+
+const minutesToDuration = (m: number) => {
     const hh = String(Math.floor(m / 60)).padStart(2, "0");
     const mm = String(m % 60).padStart(2, "0");
     return `${hh}:${mm}:00`;
@@ -187,16 +190,61 @@ export function renderCalendar(
         toggleTask,
         selectedEventIds,
     } = settings || {};
-    const slotDuration = toDuration(settings?.slotMinutes);
+    const slotMinutes = toMinutes(settings?.slotMinutes);
     // Fall back to slotDuration if snap isn't configured so that existing setups
     // keep their previous behavior.
-    const snapDuration = toDuration(settings?.snapMinutes) ?? slotDuration;
-    const shiftSnapDuration =
-        toDuration(settings?.shiftCreateSnapMinutes) ?? snapDuration;
+    const snapMinutes = toMinutes(settings?.snapMinutes) ?? slotMinutes;
+    const shiftSnapMinutes =
+        toMinutes(settings?.shiftCreateSnapMinutes) ?? snapMinutes;
+    const slotDuration =
+        slotMinutes === undefined ? undefined : minutesToDuration(slotMinutes);
+    const snapDuration =
+        snapMinutes === undefined ? undefined : minutesToDuration(snapMinutes);
     const durationOptions: Record<string, string> = {};
     if (slotDuration) durationOptions.slotDuration = slotDuration;
     if (snapDuration) durationOptions.snapDuration = snapDuration;
     let finishShiftSnapInteraction: (() => void) | null = null;
+    // Snap in force for the interaction currently in flight. Kept in sync by
+    // the Shift handling below so drops can be re-quantized against it.
+    let activeSnapMinutes = snapMinutes;
+
+    // FullCalendar moves an event by the delta between the hit under the
+    // pointer and the hit captured when the drag started, so the drop only
+    // lands on the snap grid if *both* hits were computed with the same
+    // snapDuration. Pressing Shift mid-drag changes the snap for every later
+    // hit but not for the already-captured initial one, which leaves the drop
+    // phase-shifted off the grid. Re-round the delta here so the saved times
+    // honor the snap that was active when the pointer was released.
+    const quantizeToActiveSnap = (event: EventApi, oldEvent: EventApi) => {
+        const snapMs = (activeSnapMinutes ?? 0) * 60 * 1000;
+        // All-day drags move in whole days; leave them alone.
+        if (!snapMs || event.allDay || oldEvent.allDay) return;
+        const oldStart = oldEvent.start;
+        const newStart = event.start;
+        if (!oldStart || !newStart) return;
+
+        const round = (deltaMs: number) =>
+            Math.round(deltaMs / snapMs) * snapMs;
+        const start = new Date(
+            oldStart.getTime() + round(newStart.getTime() - oldStart.getTime())
+        );
+        const oldEnd = oldEvent.end;
+        const newEnd = event.end;
+        const end =
+            oldEnd && newEnd
+                ? new Date(
+                      oldEnd.getTime() +
+                          round(newEnd.getTime() - oldEnd.getTime())
+                  )
+                : newEnd;
+
+        const startMatches = start.getTime() === newStart.getTime();
+        const endMatches =
+            !newEnd || !end || end.getTime() === newEnd.getTime();
+        if (startMatches && endMatches) return;
+
+        event.setDates(start, end, { allDay: event.allDay });
+    };
 
     const modifyEventCallback =
         modifyEvent &&
@@ -209,6 +257,7 @@ export function renderCalendar(
             oldEvent: EventApi;
             revert: () => void;
         }) => {
+            quantizeToActiveSnap(event, oldEvent);
             const success = await modifyEvent(event, oldEvent);
             if (!success) {
                 revert();
@@ -393,51 +442,66 @@ export function renderCalendar(
 
     const cleanupShiftSnap = (() => {
         if (
-            !snapDuration ||
-            !shiftSnapDuration ||
-            snapDuration === shiftSnapDuration
+            !snapMinutes ||
+            !shiftSnapMinutes ||
+            snapMinutes === shiftSnapMinutes
         ) {
             return null;
         }
 
         const doc = containerEl.ownerDocument;
         let isInteracting = false;
-        let activeSnapDuration = snapDuration;
-        const setSnapDuration = (duration: string) => {
-            if (duration === activeSnapDuration) return;
-            activeSnapDuration = duration;
-            cal.setOption("snapDuration", duration);
+        let shiftHeld = false;
+        const setSnapMinutes = (minutes: number) => {
+            if (minutes === activeSnapMinutes) return;
+            activeSnapMinutes = minutes;
+            cal.setOption("snapDuration", minutesToDuration(minutes));
         };
+        const syncSnapToShift = () =>
+            setSnapMinutes(shiftHeld ? shiftSnapMinutes : snapMinutes);
         // Applies to dragging and resizing an existing event as well as to
         // selecting empty space. FullCalendar caches the slot geometry when an
         // interaction starts, so the snap has to be in place by then — hence
-        // deciding it on mousedown, and on Shift changes up until the pointer
-        // clears the drag threshold.
+        // tracking Shift on the moves that precede mousedown, on mousedown
+        // itself, and on Shift changes while the pointer is down.
+        const trackShift = (held: boolean) => {
+            if (held === shiftHeld) return;
+            shiftHeld = held;
+            syncSnapToShift();
+        };
+        const handlePointerMove = (event: MouseEvent) => {
+            // Catches Shift already being held when the window regained focus,
+            // which produces no keydown of its own.
+            if (isInteracting) return;
+            trackShift(event.shiftKey);
+        };
         const handleMouseDown = (event: MouseEvent) => {
+            trackShift(event.shiftKey);
             isInteracting = true;
-            setSnapDuration(event.shiftKey ? shiftSnapDuration : snapDuration);
         };
-        const handleKeyChange = (event: KeyboardEvent) => {
-            if (!isInteracting) return;
-            setSnapDuration(
-                event.getModifierState("Shift")
-                    ? shiftSnapDuration
-                    : snapDuration
-            );
-        };
+        const handleKeyChange = (event: KeyboardEvent) =>
+            trackShift(event.getModifierState("Shift"));
         const finishInteraction = () => {
             if (!isInteracting) return;
             isInteracting = false;
-            window.setTimeout(() => setSnapDuration(snapDuration), 0);
+            // Deferred so the snap is still the interaction's own while
+            // FullCalendar finishes dispatching eventDrop/eventResize/select.
+            window.setTimeout(syncSnapToShift, 0);
         };
 
         finishShiftSnapInteraction = finishInteraction;
+        containerEl.addEventListener("mousemove", handlePointerMove, true);
         containerEl.addEventListener("mousedown", handleMouseDown, true);
         doc.addEventListener("keydown", handleKeyChange, true);
         doc.addEventListener("keyup", handleKeyChange, true);
         doc.addEventListener("mouseup", finishInteraction, true);
 
         return () => {
+            containerEl.removeEventListener(
+                "mousemove",
+                handlePointerMove,
+                true
+            );
             containerEl.removeEventListener("mousedown", handleMouseDown, true);
             doc.removeEventListener("keydown", handleKeyChange, true);
             doc.removeEventListener("keyup", handleKeyChange, true);
